@@ -1,0 +1,1 @@
+\COPY BIRTHS(state, state_abbreviaiton, year, gender, mother_education_level, education_level_code, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' CSV HEADER DELIMITER ','
