@@ -112,7 +112,7 @@ CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 
 		IF new.year NOT IN (SELECT anio FROM ANIO) THEN
 			id_anio = getAnioID();
-		    INSERT INTO ANIO VALUES (id_anio, new.year);
+		    INSERT INTO ANIO VALUES (id_anio, esBiciesto(new.year));
 		ELSE
 			id_anio := (SELECT anio FROM ANIO WHERE anio = new.year);
 		END IF;
@@ -123,6 +123,12 @@ CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 		ELSE
 			id_nivel_educacion := (SELECT id FROM NIVEL_EDUCACION WHERE descripcion = new.mother_education_level);
 		END IF;
+
+	    new.state := id_estado;
+	    new.year := id_anio;
+	    new.mother_education_level := id_nivel_educacion;
+
+        return new;
 
 	END;
 
@@ -137,7 +143,7 @@ CREATE TRIGGER insertarDatosTablaDefinitiva
 --copiamos los datos del csv a la tabla definitiva
 
 \COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
-
+-- select * from BIRTHS;
 
 --funcion ReporteConsolidado(n)
 
