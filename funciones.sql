@@ -39,11 +39,11 @@ CREATE TABLE BIRTHS (
 	mother_average_age FLOAT,
 	average_birth_weight FLOAT,
 
-	FOREIGN KEY (state) REFERENCES ESTADO(id),
-	FOREIGN KEY (state_abbreviation) REFERENCES ESTADO(id),
+	FOREIGN KEY (state) REFERENCES ESTADO,
+	FOREIGN KEY (state_abbreviation) REFERENCES ESTADO,
 	FOREIGN KEY (year) REFERENCES ANIO(anio),
-	FOREIGN KEY (mother_education_level) REFERENCES NIVEL_EDUCACION(id),
-	FOREIGN KEY (education_level_code) REFERENCES NIVEL_EDUCACION(id)
+	FOREIGN KEY (mother_education_level) REFERENCES NIVEL_EDUCACION,
+	FOREIGN KEY (education_level_code) REFERENCES NIVEL_EDUCACION
 );
 
 
@@ -135,15 +135,17 @@ CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 $$ LANGUAGE plpgSQL;
 
 CREATE TRIGGER insertarDatosTablaDefinitiva
-	BEFORE INSERT ON BIRTHS
-	FOR EACH ROW
-	EXECUTE PROCEDURE insertarDatosTablaDefinitiva();
+BEFORE INSERT ON BIRTHS
+FOR EACH ROW
+EXECUTE PROCEDURE insertarDatosTablaDefinitiva();
 
 
 --copiamos los datos del csv a la tabla definitiva
 
 \COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 -- select * from BIRTHS;
+-- SELECT * FROM estado;
+
 
 --funcion ReporteConsolidado(n)
 
