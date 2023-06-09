@@ -38,10 +38,9 @@ CREATE TABLE BIRTHS (
 	FOREIGN KEY (education_level_code) REFERENCES NIVEL_EDUCACION(id)
 );
 
--- select * from BIRTHS;
--- drop table births;
--- drop table nivel_educacion;
+--copiamos los datos del csv a la tabla definitiva
 
+\COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 
 --funcion para saber si es año biciesto
 
