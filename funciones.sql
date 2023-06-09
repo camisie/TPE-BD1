@@ -1,3 +1,10 @@
+--esto lo borramos despues
+drop table IF EXISTS ESTADO cascade ;
+drop table IF EXISTS ANIO cascade ;
+drop table IF EXISTS NIVEL_EDUCACION cascade ;
+drop table IF EXISTS BIRTHS;
+drop trigger IF EXISTS insertarDatosTablaDefinitiva ON BIRTHS;
+
 -- Tablas de las dimensiones
 
 CREATE TABLE ESTADO (
@@ -17,6 +24,7 @@ CREATE TABLE NIVEL_EDUCACION (
 	descripcion CHAR(100),
 	PRIMARY KEY (id)
 );
+
 
 -- Tabla definitiva
 
@@ -38,9 +46,6 @@ CREATE TABLE BIRTHS (
 	FOREIGN KEY (education_level_code) REFERENCES NIVEL_EDUCACION(id)
 );
 
---copiamos los datos del csv a la tabla definitiva
-
-\COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 
 --funcion para saber si es año biciesto
 
@@ -49,6 +54,7 @@ CREATE OR REPLACE FUNCTION esBiciesto(anio INT) RETURNS BOOLEAN AS $$
 		RETURN anio % 4 = 0 AND (anio % 100 != 0 OR anio % 400 = 0);
 	END;
 $$ LANGUAGE plpgSQL;
+
 
 --funcion para generar los ids de las tablas
 
@@ -85,6 +91,7 @@ CREATE OR REPLACE FUNCTION getNivelEducacionID() RETURNS NIVEL_EDUCACION.id%TYPE
 	END;
 
 $$ LANGUAGE plpgSQL;
+
 
 --triggers
 
@@ -127,6 +134,11 @@ CREATE TRIGGER insertarDatosTablaDefinitiva
 	EXECUTE PROCEDURE insertarDatosTablaDefinitiva();
 
 
+--copiamos los datos del csv a la tabla definitiva
+
+\COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
+
+
 --funcion ReporteConsolidado(n)
 
 CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOID RETURNS NULL ON NULL INPUT AS $$
@@ -134,4 +146,3 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 		-- todo
 	END;
 $$ LANGUAGE plpgSQL;
-
