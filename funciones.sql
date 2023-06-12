@@ -1,11 +1,8 @@
---esto lo borramos despues
 drop table IF EXISTS ESTADO cascade ;
 drop table IF EXISTS ANIO cascade ;
 drop table IF EXISTS NIVEL_EDUCACION cascade ;
 drop table IF EXISTS BIRTHS;
 drop trigger IF EXISTS insertarDatosTablaDefinitiva ON BIRTHS;
--- drop function IF EXISTS ReporteConsolidado(INT);
--- drop function IF EXISTS reporteconsolidado(cantidad_de_anios integer);
 
 -- Tablas de las dimensiones
 
@@ -136,31 +133,32 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 
 	--cursor que devuelve resultados por Estado
 	c_State CURSOR (anioIn INT) FOR
-	       SELECT nombre, SUM(births) AS Total,  AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, AVG(average_birth_weight) AS AvgWeight, MIN(average_birth_weight) AS MinWeight, MAX(average_birth_weight) AS MaxWeight
+	       SELECT nombre, SUM(births) AS Total,  AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
 	       FROM BIRTHS JOIN ESTADO ON BIRTHS.state_abbreviation = ESTADO.id
--- 	       WHERE anioIn = BIRTHS.year
+	       WHERE anioIn = BIRTHS.year
 	       GROUP BY nombre
+	       HAVING SUM(births) >= 200000
 	       ORDER BY nombre DESC ;
 
 	--cursor que devuelve resultados por Genero
 	c_Gender CURSOR (anioIn INT) FOR
-	       SELECT gender, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, AVG(average_birth_weight) AS AvgWeight, MIN(average_birth_weight) AS MinWeight, MAX(average_birth_weight) AS MaxWeight
+	       SELECT CASE WHEN gender = 'M' THEN 'Male' WHEN gender = 'F' THEN 'Female' END AS gender, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
 	       FROM BIRTHS
-	       WHERE anioIn = BIRTHS.year
+	       WHERE 2016 = BIRTHS.year
 	       GROUP BY gender
-	       ORDER BY gender;
+	       ORDER BY gender DESC;
 
 	--cursor que devuelve resultados por Educacion
 	c_Education CURSOR (anioIn INT) FOR
-	   SELECT descripcion, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, AVG(average_birth_weight) AS AvgWeight, MIN(average_birth_weight) AS MinWeight, MAX(average_birth_weight) AS MaxWeight
+	   SELECT descripcion, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
 	   FROM BIRTHS JOIN NIVEL_EDUCACION ON BIRTHS.education_level_code = NIVEL_EDUCACION.nivel
-	   WHERE anioIn = BIRTHS.year
+	   WHERE anioIn = BIRTHS.year AND descripcion != 'Unknown or Not Stated'
 	   GROUP BY descripcion
-	   ORDER BY descripcion;
+	   ORDER BY descripcion DESC;
 
 	--cursor que devuelve resultados por Año
 	c_Anio CURSOR(anioIn INT) FOR
-	   SELECT anio, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, AVG(average_birth_weight) AS AvgWeight, MIN(average_birth_weight) AS MinWeight, MAX(average_birth_weight) AS MaxWeight
+	   SELECT anio, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
 	   FROM BIRTHS JOIN anio ON BIRTHS.year = anio.anio
 	   WHERE anioIn = BIRTHS.year
 	   GROUP BY anio
@@ -185,10 +183,10 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 	        THEN SELECT MAX(anio) FROM anio INTO max_year;
 	    END IF;
 
-    	RAISE NOTICE '---------------------------------------------';
-	    RAISE NOTICE '-------CONSOLIDATED BIRTH REPORT----------';
-	    RAISE NOTICE '---------------------------------------------';
-	    RAISE NOTICE 'Year---Category-------------------Total---AvgAge---MinAge---MaxAge---AvgWeight---MinWeight---MaxWeight';
+    	RAISE NOTICE '------------------------------------------------------------------------------';
+	    RAISE NOTICE '---------------------------CONSOLIDATED BIRTH REPORT--------------------------';
+	    RAISE NOTICE '------------------------------------------------------------------------------';
+	    RAISE NOTICE 'Year---Category---------------------------------------------------------Total-------AvgAge-------MinAge-------MaxAge-------AvgWeight-------MinWeight-------MaxWeight';
 
             WHILE (current_year <= max_year) LOOP
                 year := current_year;
@@ -207,7 +205,7 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					LOOP
 						FETCH c_State INTO r_state;
 						EXIT WHEN NOT FOUND;
-						RAISE NOTICE '%   State: % - % - % - % - % - % - % - %', year, r_state.nombre::TEXT, r_state.total::INT, r_state.avgAge::FLOAT, r_state.minAge::FLOAT, r_state.maxAge::FLOAT, r_state.avgWeight::FLOAT, r_state.minWeight::FLOAT, r_state.maxWeight::FLOAT;
+						RAISE NOTICE '%   State:	    %														%		%		%		%		%		%		%', year, r_state.nombre::TEXT, r_state.total::INT, r_state.avgAge::INT, r_state.minAge::INT, r_state.maxAge::INT, r_state.avgWeight::FLOAT, r_state.minWeight::FLOAT, r_state.maxWeight::FLOAT;
 						year := '----';
 					END LOOP;
 				CLOSE c_State;
@@ -216,7 +214,7 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					LOOP
 						FETCH c_Gender INTO r_gender;
 						EXIT WHEN NOT FOUND;
-						RAISE NOTICE '%   Gender: Male - % - % - % - % - % - % - %', year, r_gender.total::INT, r_gender.avgAge::FLOAT, r_gender.minAge::FLOAT, r_gender.maxAge::FLOAT, r_gender.avgWeight::FLOAT, r_gender.minWeight::FLOAT, r_gender.maxWeight::FLOAT;
+						RAISE NOTICE '%   Gender:		%														%		%		%		%		%		%		%', year, r_gender.gender::TEXT, r_gender.total::INT, r_gender.avgAge::INT, r_gender.minAge::INT, r_gender.maxAge::INT, r_gender.avgWeight::FLOAT, r_gender.minWeight::FLOAT, r_gender.maxWeight::FLOAT;
 					END LOOP;
 				CLOSE c_Gender;
 
@@ -224,7 +222,7 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					LOOP
 						FETCH c_Education INTO r_education_level;
 						EXIT WHEN NOT FOUND;
-						RAISE NOTICE '%   Education: - % - % - % - % - % - % - % - %', year, r_education_level.descripcion::TEXT, r_education_level.total::INT, r_education_level.avgAge::FLOAT, r_education_level.minAge::FLOAT, r_education_level.maxAge::FLOAT, r_education_level.avgWeight::FLOAT, r_education_level.minWeight::FLOAT, r_education_level.maxWeight::FLOAT;
+						RAISE NOTICE '%   Education:	%														%		%		%		%		%		%		%', year, r_education_level.descripcion::TEXT, r_education_level.total::INT, r_education_level.avgAge::INT, r_education_level.minAge::INT, r_education_level.maxAge::FLOAT, r_education_level.avgWeight::FLOAT, r_education_level.minWeight::FLOAT, r_education_level.maxWeight::FLOAT;
 					END LOOP;
 				CLOSE c_Education;
 
@@ -234,7 +232,7 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					LOOP
 						FETCH c_Anio INTO r_anio;
 						EXIT WHEN NOT FOUND;
-						RAISE NOTICE '---------------------------- % - % - % - % - % - % - %', r_anio.total::INT, r_anio.avgAge::INT, r_anio.minAge::INT, r_anio.maxAge::INT, r_anio.avgWeight::INT, r_anio.minWeight::INT, r_anio.maxWeight;
+						RAISE NOTICE '------------------------------------------------------------------------- %		%		%		%		%		%		%', r_anio.total::INT, r_anio.avgAge::INT, r_anio.minAge::INT, r_anio.maxAge::INT, r_anio.avgWeight::FLOAT, r_anio.minWeight::FLOAT, r_anio.maxWeight::FLOAT;
 					END LOOP;
 				CLOSE c_Anio;
 
@@ -249,7 +247,8 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 	END;
 $$ LANGUAGE plpgSQL;
 
+--Para testear
 SELECT ReporteConsolidado(1);
 SELECT ReporteConsolidado(0);
-SELECT ReporteConsolidado(3);
+SELECT ReporteConsolidado(2);
 SELECT ReporteConsolidado(-1);
