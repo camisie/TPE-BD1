@@ -8,7 +8,7 @@ drop trigger IF EXISTS insertarDatosTablaDefinitiva ON BIRTHS;
 -- Tablas de las dimensiones
 
 CREATE TABLE ESTADO (
-	id VARCHAR(30),
+	id VARCHAR(10),
 	nombre CHAR(30),
 	PRIMARY KEY(id)
 );
@@ -20,9 +20,9 @@ CREATE TABLE ANIO (
 );
 
 CREATE TABLE NIVEL_EDUCACION (
-	id VARCHAR(10),
+	nivel VARCHAR(10),
 	descripcion CHAR(100),
-	PRIMARY KEY (id)
+	PRIMARY KEY (nivel)
 );
 
 
@@ -30,7 +30,7 @@ CREATE TABLE NIVEL_EDUCACION (
 
 CREATE TABLE BIRTHS (
 	state VARCHAR(30),
-	state_abbreviation VARCHAR(30),
+	state_abbreviation VARCHAR(10),
 	year INT,
 	gender CHAR(1),
 	mother_education_level VARCHAR(100),
@@ -55,73 +55,35 @@ CREATE OR REPLACE FUNCTION esBiciesto(anio INT) RETURNS BOOLEAN AS $$
 	END;
 $$ LANGUAGE plpgSQL;
 
-
---funcion para generar los ids de las tablas
-
-CREATE OR REPLACE FUNCTION getEstadoID() RETURNS ESTADO.id%TYPE AS $$
-    DECLARE
-        nextID ESTADO.id%TYPE;
-        prevID INT;
-    BEGIN
-        SELECT COALESCE(MAX(CAST(id AS INT)), 0) INTO prevID FROM ESTADO;
-        nextID := CAST((prevID + 1) AS VARCHAR(30));
-        RETURN nextID;
-    END;
-$$ LANGUAGE plpgSQL;
-
-CREATE OR REPLACE FUNCTION getAnioID() RETURNS ANIO.anio%TYPE AS $$
-	DECLARE
-		nextID ANIO.anio%TYPE;
-		prevID INT;
-	BEGIN
-		SELECT COALESCE(MAX(anio), 0) INTO prevID FROM ANIO;
-		nextID := prevID + 1;
-		RETURN nextID;
-	END;
-$$ LANGUAGE plpgSQL;
-
-CREATE OR REPLACE FUNCTION getNivelEducacionID() RETURNS NIVEL_EDUCACION.id%TYPE AS $$
-	DECLARE
-		nextID NIVEL_EDUCACION.id%TYPE;
-		prevID INT;
-	BEGIN
-		SELECT COALESCE(MAX(CAST(id AS INT)), 0) INTO prevID FROM NIVEL_EDUCACION;
-		nextID := CAST((prevID + 1) AS VARCHAR(10));
-		RETURN nextID;
-	END;
-
-$$ LANGUAGE plpgSQL;
-
-
---triggers
+--trigger
 
 CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 	DECLARE
 		id_estado ESTADO.id%TYPE;
 	    id_anio ANIO.anio%TYPE;
-	    id_nivel_educacion NIVEL_EDUCACION.id%TYPE;
+	    id_nivel_educacion NIVEL_EDUCACION.nivel%TYPE;
 
 	BEGIN
 
 	    IF new.state NOT IN (SELECT nombre FROM ESTADO) THEN
-            id_estado = getEstadoID();
+            id_estado = new.state_abbreviation;
 		    INSERT INTO ESTADO VALUES (id_estado, new.state);
 		ELSE
 			id_estado := (SELECT id FROM ESTADO WHERE nombre = new.state);
 		END IF;
 
 		IF new.year NOT IN (SELECT anio FROM ANIO) THEN
-			id_anio = getAnioID();
+			id_anio = new.year;
 		    INSERT INTO ANIO VALUES (id_anio, esBiciesto(new.year));
 		ELSE
 			id_anio := (SELECT anio FROM ANIO WHERE anio = new.year);
 		END IF;
 
 	    IF new.mother_education_level NOT IN (SELECT descripcion FROM NIVEL_EDUCACION) THEN
-			id_nivel_educacion = getNivelEducacionID();
+			id_nivel_educacion = new.education_level_code;
 		    INSERT INTO NIVEL_EDUCACION VALUES (id_nivel_educacion, new.mother_education_level);
 		ELSE
-			id_nivel_educacion := (SELECT id FROM NIVEL_EDUCACION WHERE descripcion = new.mother_education_level);
+			id_nivel_educacion := (SELECT nivel FROM NIVEL_EDUCACION WHERE descripcion = new.mother_education_level);
 		END IF;
 
 	    new.state := id_estado;
@@ -145,6 +107,8 @@ EXECUTE PROCEDURE insertarDatosTablaDefinitiva();
 \COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 -- select * from BIRTHS;
 -- SELECT * FROM estado;
+-- SELECT * FROM anio;
+-- SELECT * FROM nivel_educacion;
 
 
 --funcion ReporteConsolidado(n)
