@@ -1,9 +1,9 @@
 -- En caso de que ya existan tablas con el mismo nombre, las borramos
-drop table IF EXISTS ESTADO cascade ;
-drop table IF EXISTS ANIO cascade ;
-drop table IF EXISTS NIVEL_EDUCACION cascade ;
-drop table IF EXISTS BIRTHS;
-drop trigger IF EXISTS insertarDatosTablaDefinitiva ON BIRTHS;
+
+drop table IF EXISTS ESTADO cascade;
+drop table IF EXISTS ANIO cascade;
+drop table IF EXISTS NIVEL_EDUCACION cascade;
+drop table IF EXISTS NACIMIENTOS;
 
 -- Tablas de las dimensiones
 
@@ -25,11 +25,28 @@ CREATE TABLE NIVEL_EDUCACION (
 	PRIMARY KEY (nivel)
 );
 
-
 -- Tabla definitiva
 
-CREATE TABLE BIRTHS (
-	state VARCHAR(30),
+CREATE TABLE NACIMIENTOS (
+	idEstado VARCHAR(30),
+	idEducacion VARCHAR(10),
+	idAnio INT,
+	genero CHAR(1),
+	nacimientos INT,
+	edad_promedio FLOAT,
+	peso_promedio FLOAT,
+
+	PRIMARY KEY(idEstado, idAnio, idEducacion, genero),
+	FOREIGN KEY (idEstado) REFERENCES ESTADO,
+	FOREIGN KEY (idAnio) REFERENCES ANIO,
+	FOREIGN KEY (idEducacion) REFERENCES NIVEL_EDUCACION
+);
+
+-- Tabla temporal para copiar todos los datos del csv
+
+CREATE TEMPORARY TABLE TABLA_TEMPORAL_NACIMIENTOS
+(
+    state VARCHAR(30),
 	state_abbreviation VARCHAR(10),
 	year INT,
 	gender CHAR(1),
@@ -37,15 +54,8 @@ CREATE TABLE BIRTHS (
 	education_level_code VARCHAR(10),
 	births INT,
 	mother_average_age FLOAT,
-	average_birth_weight FLOAT,
-
-	FOREIGN KEY (state) REFERENCES ESTADO,
-	FOREIGN KEY (state_abbreviation) REFERENCES ESTADO,
-	FOREIGN KEY (year) REFERENCES ANIO(anio),
-	FOREIGN KEY (mother_education_level) REFERENCES NIVEL_EDUCACION,
-	FOREIGN KEY (education_level_code) REFERENCES NIVEL_EDUCACION
+	average_birth_weight FLOAT
 );
-
 
 -- Funcion para saber si es año bisiesto
 
@@ -57,7 +67,7 @@ $$ LANGUAGE plpgSQL;
 
 -- Trigger
 
-CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION insertarDatos() RETURNS trigger AS $$
 	DECLARE
 		id_estado ESTADO.id%TYPE;
 	    id_anio ANIO.anio%TYPE;
@@ -86,6 +96,8 @@ CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 			id_nivel_educacion := (SELECT nivel FROM NIVEL_EDUCACION WHERE descripcion = new.mother_education_level);
 		END IF;
 
+	    INSERT INTO NACIMIENTOS VALUES (id_estado, id_nivel_educacion, id_anio, new.gender, new.births, new.mother_average_age , new.average_birth_weight);
+
 	    new.state := id_estado;
 	    new.year := id_anio;
 	    new.mother_education_level := id_nivel_educacion;
@@ -96,15 +108,15 @@ CREATE OR REPLACE FUNCTION insertarDatosTablaDefinitiva() RETURNS trigger AS $$
 
 $$ LANGUAGE plpgSQL;
 
-CREATE TRIGGER insertarDatosTablaDefinitiva
-BEFORE INSERT ON BIRTHS
+CREATE TRIGGER insertarDatos
+BEFORE INSERT ON TABLA_TEMPORAL_NACIMIENTOS
 FOR EACH ROW
-EXECUTE PROCEDURE insertarDatosTablaDefinitiva();
+EXECUTE PROCEDURE insertarDatos();
 
 
--- Copiamos los datos del csv a la tabla definitiva
+-- Copiamos los datos del csv a la tabla auxiliar
 
-\COPY BIRTHS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
+\COPY VISTA_NACIMIENTOS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 
 -- Funcion ReporteConsolidado(n)
 
@@ -128,35 +140,39 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 		r_education_level RECORD;
 
 	-- Cursor que devuelve resultados por Estado
+
 	c_State CURSOR (anioIn INT) FOR
-	       SELECT nombre, SUM(births) AS Total,  AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
-	       FROM BIRTHS JOIN ESTADO ON BIRTHS.state_abbreviation = ESTADO.id
-	       WHERE anioIn = BIRTHS.year
+	       SELECT nombre, SUM(NACIMIENTOS.nacimientos) AS Total,  AVG(edad_promedio) AS AvgAge, MIN(edad_promedio) AS MinAge, MAX(edad_promedio) AS MaxAge, CAST( (AVG(peso_promedio) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
+	       FROM NACIMIENTOS JOIN ESTADO ON NACIMIENTOS.idEstado = ESTADO.id
+	       WHERE anioIn = NACIMIENTOS.idAnio
 	       GROUP BY nombre
-	       HAVING SUM(births) >= 200000
+	       HAVING SUM(NACIMIENTOS.nacimientos) >= 200000
 	       ORDER BY nombre DESC ;
 
 	-- Cursor que devuelve resultados por Genero
+
 	c_Gender CURSOR (anioIn INT) FOR
-	       SELECT CASE WHEN gender = 'M' THEN 'Male' WHEN gender = 'F' THEN 'Female' END AS gender, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
-	       FROM BIRTHS
-	       WHERE anioIn = BIRTHS.year
+	       SELECT CASE WHEN genero = 'M' THEN 'Male' WHEN genero = 'F' THEN 'Female' END AS gender, SUM(NACIMIENTOS.nacimientos) AS Total,  AVG(edad_promedio) AS AvgAge, MIN(edad_promedio) AS MinAge, MAX(edad_promedio) AS MaxAge, CAST( (AVG(peso_promedio) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
+	       FROM NACIMIENTOS
+	       WHERE anioIn = NACIMIENTOS.idAnio
 	       GROUP BY gender
 	       ORDER BY gender DESC;
 
 	-- Cursor que devuelve resultados por Educacion
+
 	c_Education CURSOR (anioIn INT) FOR
-	   SELECT descripcion, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
-	   FROM BIRTHS JOIN NIVEL_EDUCACION ON BIRTHS.education_level_code = NIVEL_EDUCACION.nivel
-	   WHERE anioIn = BIRTHS.year AND descripcion != 'Unknown or Not Stated'
+	   SELECT descripcion, SUM(NACIMIENTOS.nacimientos) AS Total,  AVG(edad_promedio) AS AvgAge, MIN(edad_promedio) AS MinAge, MAX(edad_promedio) AS MaxAge, CAST( (AVG(peso_promedio) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
+	   FROM NACIMIENTOS JOIN NIVEL_EDUCACION ON NACIMIENTOS.idEducacion = NIVEL_EDUCACION.nivel
+	   WHERE anioIn = NACIMIENTOS.idAnio AND descripcion != 'Unknown or Not Stated'
 	   GROUP BY descripcion
 	   ORDER BY descripcion DESC;
 
 	-- Cursor que devuelve resultados por Año
+
 	c_Anio CURSOR(anioIn INT) FOR
-	   SELECT anio, SUM(births) AS Total, AVG(mother_average_age) AS AvgAge, MIN(mother_average_age) AS MinAge, MAX(mother_average_age) AS MaxAge, CAST( (AVG(average_birth_weight) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(average_birth_weight) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
-	   FROM BIRTHS JOIN anio ON BIRTHS.year = anio.anio
-	   WHERE anioIn = BIRTHS.year
+	   SELECT anio, SUM(NACIMIENTOS.nacimientos) AS Total,  AVG(edad_promedio) AS AvgAge, MIN(edad_promedio) AS MinAge, MAX(edad_promedio) AS MaxAge, CAST( (AVG(peso_promedio) / 1000 ) AS DECIMAL(5, 3)) AS AvgWeight, CAST( (MIN(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MinWeight, CAST( (MAX(peso_promedio) / 1000) AS DECIMAL(5, 3)) AS MaxWeight
+	   FROM NACIMIENTOS JOIN anio ON NACIMIENTOS.idAnio = anio.anio
+	   WHERE anioIn = NACIMIENTOS.idAnio
 	   GROUP BY anio
 	   ORDER BY anio;
 
