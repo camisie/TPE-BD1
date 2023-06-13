@@ -1,10 +1,3 @@
--- En caso de que ya existan tablas con el mismo nombre, las borramos
-
-drop table IF EXISTS ESTADO cascade;
-drop table IF EXISTS ANIO cascade;
-drop table IF EXISTS NIVEL_EDUCACION cascade;
-drop table IF EXISTS NACIMIENTOS;
-
 -- Tablas de las dimensiones
 
 CREATE TABLE ESTADO (
