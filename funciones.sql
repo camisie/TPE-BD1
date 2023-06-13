@@ -116,7 +116,7 @@ EXECUTE PROCEDURE insertarDatos();
 
 -- Copiamos los datos del csv a la tabla auxiliar
 
-\COPY VISTA_NACIMIENTOS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
+\COPY TABLA_TEMPORAL_NACIMIENTOS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
 
 -- Funcion ReporteConsolidado(n)
 
