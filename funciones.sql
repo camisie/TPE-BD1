@@ -106,7 +106,6 @@ BEFORE INSERT ON TABLA_TEMPORAL_NACIMIENTOS
 FOR EACH ROW
 EXECUTE PROCEDURE insertarDatos();
 
-
 -- Copiamos los datos del csv a la tabla auxiliar
 
 \COPY TABLA_TEMPORAL_NACIMIENTOS(state, state_abbreviation, year, gender, mother_education_level, education_level_code, births, mother_average_age, average_birth_weight) FROM 'us_births_2016_2021.csv' DELIMITER ',' CSV HEADER;
@@ -228,8 +227,6 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					END LOOP;
 				CLOSE c_Education;
 
-
-				-- Se ejecuta el cursor Anio
 				OPEN c_Anio(anioIn := current_year);
 					LOOP
 						FETCH c_Anio INTO r_anio;
@@ -239,7 +236,6 @@ CREATE OR REPLACE FUNCTION ReporteConsolidado(cantidad_de_anios INT) RETURNS VOI
 					END LOOP;
 				CLOSE c_Anio;
 
-				-- Se incrementa el anio seleccionado en una unidad
 				current_year = current_year + 1;
 
 			END LOOP;
